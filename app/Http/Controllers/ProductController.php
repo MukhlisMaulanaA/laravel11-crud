@@ -8,6 +8,13 @@ use App\Models\Product;
 //import return type View
 use Illuminate\View\View;
 
+//import return type redirectResponse
+use Illuminate\Http\Request;
+
+//import Http Request
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
+
 class ProductController extends Controller
 {
   /**
@@ -23,4 +30,62 @@ class ProductController extends Controller
     //render view with products
     return view('products.index', compact('products'));
   }
+
+  /**
+   * create
+   *
+   * @return View
+   */
+  public function create(): View
+  {
+    return view('products.create');
+  }
+
+  /**
+   * store
+   *
+   * @param  mixed $request
+   * @return RedirectResponse
+   */
+  public function store(Request $request)
+  {
+    // Validasi form
+    $validated = $request->validate([
+      'image' => 'required|image|mimes:jpeg,jpg,png|max:2048',
+      'title' => 'required|min:5',
+      'description' => 'required|min:10',
+      'price' => 'required|numeric',
+      'stock' => 'required|numeric'
+    ]);
+
+    try {
+      // Upload dan simpan gambar
+      if ($request->hasFile('image')) {
+        $image = $request->file('image');
+        $imageName = $image->hashName(); // Generate nama unik
+
+        // Simpan gambar ke storage publik
+        Storage::disk('public')->put('products/' . $imageName, file_get_contents($image));
+
+        // Buat produk dengan data yang divalidasi
+        Product::create([
+          'image' => $imageName, // Simpan hanya nama file
+          'title' => $validated['title'],
+          'description' => $validated['description'],
+          'price' => $validated['price'],
+          'stock' => $validated['stock']
+        ]);
+
+        return redirect()
+          ->route('products.index')
+          ->with('success', 'Data Berhasil Disimpan!');
+      }
+    } catch (\Exception $e) {
+      return redirect()
+        ->back()
+        ->withInput()
+        ->with('error', 'Terjadi kesalahan saat menyimpan data: ' . $e->getMessage());
+    }
+  }
+
 }
