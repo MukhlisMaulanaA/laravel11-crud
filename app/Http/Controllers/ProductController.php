@@ -88,4 +88,82 @@ class ProductController extends Controller
     }
   }
 
+  public function show(string $id): View
+  {
+    //get product by ID
+    $product = Product::findOrFail($id);
+
+    //render view with product
+    return view('products.show', compact('product'));
+  }
+
+  public function edit(string $id): View
+  {
+    //get product by ID
+    $product = Product::findOrFail($id);
+
+    //render view with product
+    return view('products.edit', compact('product'));
+  }
+
+  public function update(Request $request, Product $product)
+  {
+    // Validasi form
+    $rules = [
+      'title' => 'required|min:5',
+      'description' => 'required|min:10',
+      'price' => 'required|numeric',
+      'stock' => 'required|numeric'
+    ];
+
+    // Tambahkan validasi gambar jika ada upload gambar baru
+    if ($request->hasFile('image')) {
+      $rules['image'] = 'required|image|mimes:jpeg,jpg,png|max:2048';
+    }
+
+    $validated = $request->validate($rules);
+
+    try {
+      // Handle image upload jika ada gambar baru
+      if ($request->hasFile('image')) {
+        // Hapus gambar lama
+        if ($product->image && Storage::disk('public')->exists('products/' . $product->image)) {
+          Storage::disk('public')->delete('products/' . $product->image);
+        }
+
+        // Upload gambar baru
+        $image = $request->file('image');
+        $imageName = $image->hashName();
+        Storage::disk('public')->put('products/' . $imageName, file_get_contents($image));
+
+        // Update data produk dengan gambar baru
+        $product->update([
+          'image' => $imageName,
+          'title' => $validated['title'],
+          'description' => $validated['description'],
+          'price' => $validated['price'],
+          'stock' => $validated['stock']
+        ]);
+      } else {
+        // Update data produk tanpa mengubah gambar
+        $product->update([
+          'title' => $validated['title'],
+          'description' => $validated['description'],
+          'price' => $validated['price'],
+          'stock' => $validated['stock']
+        ]);
+      }
+
+      return redirect()
+        ->route('products.index')
+        ->with('success', 'Data Berhasil Diperbarui!');
+
+    } catch (\Exception $e) {
+      return redirect()
+        ->back()
+        ->withInput()
+        ->with('error', 'Terjadi kesalahan saat memperbarui data: ' . $e->getMessage());
+    }
+  }
+
 }
